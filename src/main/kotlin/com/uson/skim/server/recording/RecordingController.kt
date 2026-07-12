@@ -101,7 +101,10 @@ class RecordingController(
         val region = try {
             HttpRange.parseRanges(range).single().toResourceRegion(resource)
         } catch (exception: IllegalArgumentException) {
-            throw ResponseStatusException(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, "Invalid audio range", exception)
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_RANGE, "bytes */${java.nio.file.Files.size(path)}")
+                .build()
         }
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
@@ -111,6 +114,6 @@ class RecordingController(
 
     private fun recording(id: UUID): RecordingEntity = recordings.findById(id)
         .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Recording not found") }
-}
 
-private fun RecordingEntity.toResponse() = RecordingResponse(id, title, status, durationMs, createdAt, audioStorageKey != null)
+    private fun RecordingEntity.toResponse() = RecordingResponse(id, title, status, durationMs, createdAt, workflow.hasAudio(this))
+}

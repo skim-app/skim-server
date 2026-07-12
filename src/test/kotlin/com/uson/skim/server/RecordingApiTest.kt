@@ -10,6 +10,8 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.post
 import org.springframework.mock.web.MockMultipartFile
+import java.nio.file.Files
+import java.nio.file.Path
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +56,12 @@ class RecordingApiTest(@Autowired private val mockMvc: MockMvc) {
             header { string("Accept-Ranges", "bytes") }
             header { string("Content-Range", "bytes 0-1/4") }
         }
+        mockMvc.get("/v1/recordings/$id/audio") {
+            header("Range", "bytes=4-5")
+        }.andExpect {
+            status { isRequestedRangeNotSatisfiable() }
+            header { string("Content-Range", "bytes */4") }
+        }
     }
 
     @Test
@@ -76,6 +84,38 @@ class RecordingApiTest(@Autowired private val mockMvc: MockMvc) {
             status { isOk() }
             jsonPath("$[0].id") { value(id) }
             jsonPath("$[0].title") { value("앱 아이디어 메모") }
+            jsonPath("$[0].audioAvailable") { value(false) }
+        }
+    }
+
+    @Test
+    fun `reports missing audio as unavailable and returns not found`() {
+        val created = mockMvc.post("/v1/recordings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"파일 누락 메모"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = Regex("\\\"id\\\":\\\"([^\\\"]+)\\\"").find(created.response.contentAsString)!!.groupValues[1]
+        val audio = MockMultipartFile("file", "missing.m4a", "audio/mp4", byteArrayOf(1, 2, 3, 4))
+
+        mockMvc.multipart("/v1/recordings/$id/audio") { file(audio) }.andExpect {
+            status { isOk() }
+            jsonPath("$.audioAvailable") { value(true) }
+        }
+        Files.delete(Path.of(System.getProperty("java.io.tmpdir"), "skim-audio", "$id-m4a"))
+
+        mockMvc.get("/v1/recordings/$id").andExpect {
+            status { isOk() }
+            jsonPath("$.audioAvailable") { value(false) }
+        }
+        mockMvc.get("/v1/recordings/$id/audio").andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    fun `returns not found for unknown recording audio`() {
+        mockMvc.get("/v1/recordings/00000000-0000-0000-0000-000000000099/audio").andExpect {
+            status { isNotFound() }
         }
     }
 }

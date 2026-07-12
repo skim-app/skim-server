@@ -61,6 +61,8 @@ class AudioWorkflowService(
 
     fun audioPath(recording: RecordingEntity): Path = Path.of(storageDirectory).resolve(requireNotNull(recording.audioStorageKey) { "Audio not found" })
 
+    fun hasAudio(recording: RecordingEntity): Boolean = recording.audioStorageKey != null && Files.isRegularFile(audioPath(recording))
+
     private companion object {
         const val MAX_AUDIO_BYTES = 10L * 1024 * 1024
         val terminalOrActiveStatuses = setOf("TRANSCRIBING", "SUMMARIZING", "COMPLETED")
