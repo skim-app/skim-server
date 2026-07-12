@@ -47,6 +47,13 @@ class RecordingApiTest(@Autowired private val mockMvc: MockMvc) {
             header { string("Accept-Ranges", "bytes") }
             content { contentTypeCompatibleWith(MediaType("audio", "mp4")) }
         }
+        mockMvc.get("/v1/recordings/$id/audio") {
+            header("Range", "bytes=0-1")
+        }.andExpect {
+            status { isPartialContent() }
+            header { string("Accept-Ranges", "bytes") }
+            header { string("Content-Range", "bytes 0-1/4") }
+        }
     }
 
     @Test
