@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: skim
+      POSTGRES_USER: skim
+      POSTGRES_PASSWORD: skim
+    ports:
+      - "${SKIM_POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skim -d skim"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: .
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skim
+      SPRING_DATASOURCE_USERNAME: skim
+      SPRING_DATASOURCE_PASSWORD: skim
+      SKIM_STORAGE_DIRECTORY: /data/audio
+    ports:
+      - "${SKIM_API_HOST_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - audio-data:/data/audio
+
+volumes:
+  postgres-data:
+  audio-data:
